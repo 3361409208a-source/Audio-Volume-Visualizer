@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, ChangeEvent } from 'react';
-import { Upload, Play, Pause, Music, Volume2, Activity, BarChart3, Disc, Sparkles, Palette, Settings2, Share2 } from 'lucide-react';
+import { Upload, Play, Pause, Music, Volume2, Activity, BarChart3, Disc, Sparkles, Palette, Settings2, Share2, Image as ImageIcon, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 type VisualMode = 'waveform' | 'bars' | 'circular' | 'particles';
@@ -40,6 +40,7 @@ const THEMES = {
 
 export default function App() {
   const [file, setFile] = useState<File | null>(null);
+  const [bgImage, setBgImage] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [volume, setVolume] = useState(0);
@@ -72,6 +73,14 @@ export default function App() {
         size: Math.random() * 2 + 1,
         color: `hsla(${Math.random() * 360}, 70%, 70%, 0.6)`
       }));
+    }
+  };
+
+  const handleBgChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      if (bgImage) URL.revokeObjectURL(bgImage);
+      setBgImage(URL.createObjectURL(selectedFile));
     }
   };
 
@@ -134,7 +143,7 @@ export default function App() {
         }
       }
 
-      ctx.fillStyle = 'rgba(2, 6, 23, 0.15)'; 
+      ctx.fillStyle = bgImage ? 'rgba(2, 6, 23, 0.35)' : 'rgba(2, 6, 23, 0.15)'; 
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       const centerX = canvas.width / 2;
@@ -169,14 +178,12 @@ export default function App() {
         ctx.lineWidth = 4;
         ctx.stroke();
 
-        // Outer Glow
         const gradient = ctx.createRadialGradient(centerX, centerY, radius * 0.8, centerX, centerY, radius * 2);
         gradient.addColorStop(0, 'transparent');
         gradient.addColorStop(1, `${currentTheme.primary}10`);
         ctx.fillStyle = gradient;
         ctx.fill();
 
-        // Pulsing dots
         for (let i = 0; i < 48; i++) {
           const angle = (i / 48) * Math.PI * 2 - rotation * 1.5;
           const v = dataArray[(i * 4) % bufferLength] / 255;
@@ -215,11 +222,10 @@ export default function App() {
     };
     draw();
     return () => animationRef.current ? cancelAnimationFrame(animationRef.current) : undefined;
-  }, [visualMode, theme]);
+  }, [visualMode, theme, bgImage]);
 
   return (
     <div className="min-h-screen bg-[#020617] text-slate-100 font-sans selection:bg-blue-500/30 overflow-x-hidden antialiased">
-      {/* Background Ambient Layers */}
       <div className="fixed inset-0 pointer-events-none">
         <div className={`absolute -top-[20%] -left-[10%] w-[60%] h-[60%] ${THEMES[theme].bgGlow1} blur-[140px] rounded-full transition-all duration-1000`} />
         <div className={`absolute -bottom-[20%] -right-[10%] w-[60%] h-[60%] ${THEMES[theme].bgGlow2} blur-[140px] rounded-full transition-all duration-1000`} />
@@ -227,7 +233,6 @@ export default function App() {
       </div>
 
       <div className="relative z-10 max-w-6xl mx-auto px-8 py-10">
-        {/* Navigation / Header */}
         <header className="mb-14 flex items-center justify-between">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-4">
             <div className={`p-2.5 rounded-2xl bg-gradient-to-br ${THEMES[theme].textGradient} opacity-20`} />
@@ -247,17 +252,36 @@ export default function App() {
                   </button>
                 ))}
              </div>
+             
+             <div className="relative">
+               <input type="file" className="absolute inset-0 opacity-0 cursor-pointer w-10 h-10 z-20" accept="image/*" onChange={handleBgChange} title="上传背景图" />
+               <button className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors">
+                 <ImageIcon size={18} />
+               </button>
+             </div>
+
              <button className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors">
                <Settings2 size={18} />
              </button>
           </div>
         </header>
 
-        {/* Workspace */}
         <main className="grid lg:grid-cols-[1fr_320px] gap-10 items-start">
           <div className="space-y-8">
-            {/* Stage */}
             <div className="relative aspect-[16/9] bg-black/40 backdrop-blur-2xl rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl group">
+              {bgImage && (
+                <div className="absolute inset-0 z-0">
+                  <img src={bgImage} className="w-full h-full object-cover opacity-50 mix-blend-luminosity grayscale" alt="Stage Background" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-transparent to-transparent opacity-60" />
+                  <button 
+                    onClick={() => setBgImage(null)}
+                    className="absolute top-8 right-8 z-30 p-2 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full text-slate-400 hover:text-white transition-all shadow-xl"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+
               <div className="absolute top-8 left-8 z-20 flex items-center gap-3 px-4 py-2 bg-black/20 backdrop-blur-xl border border-white/5 rounded-full">
                 <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : 'bg-slate-600'}`} />
                 <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
@@ -265,9 +289,8 @@ export default function App() {
                 </span>
               </div>
 
-              <canvas ref={canvasRef} width={1200} height={675} className="w-full h-full cursor-none" />
+              <canvas ref={canvasRef} width={1200} height={675} className="relative z-10 w-full h-full cursor-none" />
               
-              {/* Overlay Controls */}
               <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-4 group-hover:translate-y-0">
                 <div className="flex items-center gap-6 px-8 py-5 bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-2xl">
                     <button onClick={togglePlay} className="w-14 h-14 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl">
@@ -290,7 +313,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Bottom Section: Upload & Info */}
             {!file ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-[3rem] hover:border-white/10 hover:bg-white/[0.02] transition-all cursor-pointer relative overflow-hidden group">
                 <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="audio/*" onChange={handleFileChange} />
@@ -321,7 +343,6 @@ export default function App() {
           </div>
 
           <aside className="space-y-8">
-            {/* Status Panel */}
             <div className="p-8 bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] space-y-10">
               <div className="flex items-center justify-between">
                 <h5 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">实时遥测数据</h5>
@@ -339,7 +360,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Advanced Indicators */}
               <div className="space-y-6">
                 <div className="space-y-2.5">
                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-500">
