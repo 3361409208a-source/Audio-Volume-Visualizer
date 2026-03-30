@@ -18,3 +18,4 @@ View your app in AI Studio: https://ai.studio/apps/7930cea1-8d61-4d40-a4f6-0aac0
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+# Audio-Volume-Visualizer
