@@ -55,8 +55,20 @@ export default function App() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const animationRef = useRef<number | null>(null);
+  const bgImgRef = useRef<HTMLImageElement | null>(null);
   
   const particles = useRef<{ x: number; y: number; vx: number; vy: number; size: number; color: string }[]>([]);
+
+  // Load background image into ref for canvas drawing
+  useEffect(() => {
+    if (bgImage) {
+      const img = new Image();
+      img.src = bgImage;
+      img.onload = () => { bgImgRef.current = img; };
+    } else {
+      bgImgRef.current = null;
+    }
+  }, [bgImage]);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -104,31 +116,39 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!analyserRef.current || !canvasRef.current) return;
+    // If it's playing but the loop isn't started, or it needs to restart on config change
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const bufferLength = analyserRef.current.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
     const draw = () => {
       animationRef.current = requestAnimationFrame(draw);
-      analyserRef.current!.getByteFrequencyData(dataArray);
-
-      let sum = 0;
-      let bassSum = 0;
-      const bassRange = Math.floor(bufferLength * 0.1); 
-      for (let i = 0; i < bufferLength; i++) {
-        sum += dataArray[i];
-        if (i < bassRange) bassSum += dataArray[i];
+      
+      const hasAnalyser = !!analyserRef.current;
+      const bufferLength = hasAnalyser ? analyserRef.current!.frequencyBinCount : 512;
+      const dataArray = new Uint8Array(bufferLength);
+      
+      if (hasAnalyser) {
+        analyserRef.current!.getByteFrequencyData(dataArray);
+        let sum = 0;
+        let bassSum = 0;
+        const bassRange = Math.floor(bufferLength * 0.1); 
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+          if (i < bassRange) bassSum += dataArray[i];
+        }
+        setVolume(sum / bufferLength);
+        setBass(bassSum / bassRange);
+      } else {
+        setVolume(0);
+        setBass(0);
       }
-      setVolume(sum / bufferLength);
-      setBass(bassSum / bassRange);
 
       const currentTheme = THEMES[theme];
 
-      if (miniCanvasRef.current) {
+      // Mini spectral view
+      if (miniCanvasRef.current && hasAnalyser) {
         const miniCtx = miniCanvasRef.current.getContext('2d');
         if (miniCtx) {
           const mWidth = miniCanvasRef.current.width;
@@ -143,86 +163,112 @@ export default function App() {
         }
       }
 
-      ctx.fillStyle = bgImage ? 'rgba(2, 6, 23, 0.35)' : 'rgba(2, 6, 23, 0.15)'; 
+      // 1. Draw Background
+      if (bgImgRef.current) {
+        ctx.save();
+        ctx.globalAlpha = 1.0;
+        ctx.drawImage(bgImgRef.current, 0, 0, canvas.width, canvas.height);
+        // Apply grayscale/luminosity like in CSS
+        ctx.globalCompositeOperation = 'luminosity';
+        ctx.fillStyle = '#888';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+        
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.7)'; // Dimming background for visuals
+      } else {
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.15)'; 
+      }
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
 
-      if (visualMode === 'bars') {
-        const barWidth = (canvas.width / bufferLength) * 1.5;
-        for (let i = 0; i < bufferLength; i++) {
-          const val = dataArray[i] / 255;
-          const h = val * canvas.height * 0.45;
-          const hue = currentTheme.hueBase + (i / bufferLength) * currentTheme.hueRange;
-          ctx.fillStyle = `hsla(${hue}, 80%, 65%, 0.9)`;
-          ctx.shadowBlur = 10;
-          ctx.shadowColor = `hsla(${hue}, 80%, 65%, 0.4)`;
-          ctx.fillRect(i * barWidth * 1.8, centerY - h, barWidth, h * 2);
-        }
-      } else if (visualMode === 'circular') {
-        const rotation = Date.now() / 5000;
-        const radius = 120 + (bass / 255) * 50;
-        
-        ctx.beginPath();
-        for (let i = 0; i <= bufferLength; i++) {
-          const angle = (i / bufferLength) * Math.PI * 2 + rotation;
-          const v = dataArray[i % bufferLength] / 255;
-          const r = radius + v * 60;
-          const x = centerX + Math.cos(angle) * r;
-          const y = centerY + Math.sin(angle) * r;
-          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.closePath();
-        ctx.strokeStyle = currentTheme.primary;
-        ctx.lineWidth = 4;
-        ctx.stroke();
-
-        const gradient = ctx.createRadialGradient(centerX, centerY, radius * 0.8, centerX, centerY, radius * 2);
-        gradient.addColorStop(0, 'transparent');
-        gradient.addColorStop(1, `${currentTheme.primary}10`);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-
-        for (let i = 0; i < 48; i++) {
-          const angle = (i / 48) * Math.PI * 2 - rotation * 1.5;
-          const v = dataArray[(i * 4) % bufferLength] / 255;
-          const r = radius + 80 + v * 40;
+      // 2. Draw Visuals
+      if (hasAnalyser) {
+        if (visualMode === 'bars') {
+          const barWidth = (canvas.width / bufferLength) * 1.5;
+          for (let i = 0; i < bufferLength; i++) {
+            const val = dataArray[i] / 255;
+            const h = val * canvas.height * 0.45;
+            const hue = currentTheme.hueBase + (i / bufferLength) * currentTheme.hueRange;
+            ctx.fillStyle = `hsla(${hue}, 80%, 65%, 0.8)`;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = `hsla(${hue}, 80%, 65%, 0.3)`;
+            ctx.fillRect(i * barWidth * 1.8, centerY - h, barWidth, h * 2);
+          }
+        } else if (visualMode === 'circular') {
+          const rotation = Date.now() / 5000;
+          const radius = 120 + (bass / 255) * 50;
           ctx.beginPath();
-          ctx.arc(centerX + Math.cos(angle) * r, centerY + Math.sin(angle) * r, 1.5 + v * 3, 0, Math.PI * 2);
-          ctx.fillStyle = v > 0.5 ? '#fff' : `${currentTheme.secondary}aa`;
-          ctx.fill();
-        }
-      } else if (visualMode === 'particles') {
-        particles.current.forEach((p, i) => {
-          const v = dataArray[i % bufferLength] / 255;
-          p.x += p.vx * (1 + v * 4);
-          p.y += p.vy * (1 + v * 4);
-          if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
-          if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+          for (let i = 0; i <= bufferLength; i++) {
+            const angle = (i / bufferLength) * Math.PI * 2 + rotation;
+            const v = dataArray[i % bufferLength] / 255;
+            const r = radius + v * 60;
+            const x = centerX + Math.cos(angle) * r;
+            const y = centerY + Math.sin(angle) * r;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.closePath();
+          ctx.strokeStyle = currentTheme.primary;
+          ctx.lineWidth = 4;
+          ctx.stroke();
           
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size * (1 + v * 2.5), 0, Math.PI * 2);
-          ctx.fillStyle = `hsla(${currentTheme.hueBase + (i % 40)}, 80%, 70%, ${0.3 + v * 0.7})`;
+          const gradient = ctx.createRadialGradient(centerX, centerY, radius * 0.8, centerX, centerY, radius * 2);
+          gradient.addColorStop(0, 'transparent');
+          gradient.addColorStop(1, `${currentTheme.primary}10`);
+          ctx.fillStyle = gradient;
           ctx.fill();
-        });
-      } else {
-        analyserRef.current!.getByteTimeDomainData(dataArray);
-        ctx.beginPath();
-        const sliceWidth = canvas.width / bufferLength;
-        for (let i = 0; i < bufferLength; i++) {
-          const v = dataArray[i] / 128.0;
-          const y = v * canvas.height / 2;
-          if (i === 0) ctx.moveTo(i * sliceWidth, y); else ctx.lineTo(i * sliceWidth, y);
+
+          for (let i = 0; i < 48; i++) {
+            const angle = (i / 48) * Math.PI * 2 - rotation * 1.5;
+            const v = dataArray[(i * 4) % bufferLength] / 255;
+            const r = radius + 80 + v * 40;
+            ctx.beginPath();
+            ctx.arc(centerX + Math.cos(angle) * r, centerY + Math.sin(angle) * r, 1.5 + v * 3, 0, Math.PI * 2);
+            ctx.fillStyle = v > 0.5 ? '#fff' : `${currentTheme.secondary}aa`;
+            ctx.fill();
+          }
+        } else if (visualMode === 'particles') {
+          particles.current.forEach((p, i) => {
+            const v = dataArray[i % bufferLength] / 255;
+            p.x += p.vx * (1 + v * 4);
+            p.y += p.vy * (1 + v * 4);
+            if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+            if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size * (1 + v * 2.5), 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${currentTheme.hueBase + (i % 40)}, 80%, 70%, ${0.3 + v * 0.7})`;
+            ctx.fill();
+          });
+        } else {
+          analyserRef.current!.getByteTimeDomainData(dataArray);
+          ctx.beginPath();
+          const sliceWidth = canvas.width / bufferLength;
+          for (let i = 0; i < bufferLength; i++) {
+            const v = dataArray[i] / 128.0;
+            const y = v * canvas.height / 2;
+            if (i === 0) ctx.moveTo(i * sliceWidth, y); else ctx.lineTo(i * sliceWidth, y);
+          }
+          ctx.strokeStyle = currentTheme.secondary;
+          ctx.lineWidth = 3;
+          ctx.stroke();
         }
-        ctx.strokeStyle = currentTheme.secondary;
-        ctx.lineWidth = 3;
-        ctx.stroke();
       }
+
+      // 3. Draw On-Stage Values
+      ctx.save();
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.font = 'bold 12px monospace';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.fillText(`峰值 PEAK: ${Math.round(volume).toString().padStart(3, '0')}`, canvas.width - 40, 40);
+      ctx.fillText(`能量 BASS: ${Math.round(bass).toString().padStart(3, '0')}`, canvas.width - 40, 60);
+      ctx.restore();
     };
+
     draw();
     return () => animationRef.current ? cancelAnimationFrame(animationRef.current) : undefined;
-  }, [visualMode, theme, bgImage]);
+  }, [visualMode, theme, isPlaying]); // Re-start loop when isPlaying changes or visual config changes
 
   return (
     <div className="min-h-screen bg-[#020617] text-slate-100 font-sans selection:bg-blue-500/30 overflow-x-hidden antialiased">
@@ -269,25 +315,21 @@ export default function App() {
         <main className="grid lg:grid-cols-[1fr_320px] gap-10 items-start">
           <div className="space-y-8">
             <div className="relative aspect-[16/9] bg-black/40 backdrop-blur-2xl rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl group">
-              {bgImage && (
-                <div className="absolute inset-0 z-0">
-                  <img src={bgImage} className="w-full h-full object-cover opacity-50 mix-blend-luminosity grayscale" alt="Stage Background" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-transparent to-transparent opacity-60" />
-                  <button 
-                    onClick={() => setBgImage(null)}
-                    className="absolute top-8 right-8 z-30 p-2 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full text-slate-400 hover:text-white transition-all shadow-xl"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              )}
-
               <div className="absolute top-8 left-8 z-20 flex items-center gap-3 px-4 py-2 bg-black/20 backdrop-blur-xl border border-white/5 rounded-full">
                 <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : 'bg-slate-600'}`} />
                 <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
                   {isPlaying ? '波形同步中' : '系统待命'}
                 </span>
               </div>
+
+              {bgImage && (
+                <button 
+                  onClick={() => setBgImage(null)}
+                  className="absolute top-8 right-8 z-30 p-2 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full text-slate-400 hover:text-white transition-all shadow-xl"
+                >
+                  <X size={16} />
+                </button>
+              )}
 
               <canvas ref={canvasRef} width={1200} height={675} className="relative z-10 w-full h-full cursor-none" />
               
