@@ -1,8 +1,21 @@
+# node_modules
 node_modules/
-build/
+package-lock.json
+
+# Production
 dist/
-coverage/
+dist-ssr/
+*.local
+
+# Editor
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
 .DS_Store
-*.log
-.env*
-!.env.example
+Thumbs.db

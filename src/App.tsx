@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, ChangeEvent } from 'react';
-import { Upload, Play, Pause, Music, Volume2, Activity, BarChart3, Disc, Sparkles, Palette } from 'lucide-react';
+import { Upload, Play, Pause, Music, Volume2, Activity, BarChart3, Disc, Sparkles, Palette, Settings2, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 type VisualMode = 'waveform' | 'bars' | 'circular' | 'particles';
@@ -9,29 +9,32 @@ const THEMES = {
   cyberpunk: {
     primary: '#ec4899',
     secondary: '#06b6d4',
-    bgGlow1: 'bg-pink-900/20',
-    bgGlow2: 'bg-cyan-900/20',
+    bgGlow1: 'bg-pink-500/10',
+    bgGlow2: 'bg-cyan-500/10',
     textGradient: 'from-pink-400 via-purple-400 to-cyan-400',
     hueBase: 300,
     hueRange: 60,
+    name: '赛博朋克'
   },
   ocean: {
     primary: '#3b82f6',
     secondary: '#14b8a6',
-    bgGlow1: 'bg-blue-900/20',
-    bgGlow2: 'bg-teal-900/20',
+    bgGlow1: 'bg-blue-500/10',
+    bgGlow2: 'bg-teal-500/10',
     textGradient: 'from-blue-400 via-sky-400 to-teal-400',
     hueBase: 200,
     hueRange: 40,
+    name: '深邃海洋'
   },
   fire: {
     primary: '#ef4444',
     secondary: '#f97316',
-    bgGlow1: 'bg-red-900/20',
-    bgGlow2: 'bg-orange-900/20',
+    bgGlow1: 'bg-red-500/10',
+    bgGlow2: 'bg-orange-500/10',
     textGradient: 'from-red-400 via-orange-400 to-yellow-400',
     hueBase: 15,
     hueRange: 40,
+    name: '极乐烈焰'
   }
 };
 
@@ -52,7 +55,6 @@ export default function App() {
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const animationRef = useRef<number | null>(null);
   
-  // Particle state
   const particles = useRef<{ x: number; y: number; vx: number; vy: number; size: number; color: string }[]>([]);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -62,21 +64,19 @@ export default function App() {
       setFile(selectedFile);
       setAudioUrl(URL.createObjectURL(selectedFile));
       setIsPlaying(false);
-      // Reset particles
-      particles.current = Array.from({ length: 100 }, () => ({
-        x: Math.random() * 800,
-        y: Math.random() * 300,
-        vx: (Math.random() - 0.5) * 2,
-        vy: (Math.random() - 0.5) * 2,
-        size: Math.random() * 3 + 1,
-        color: `hsla(${Math.random() * 360}, 70%, 60%, 0.8)`
+      particles.current = Array.from({ length: 120 }, () => ({
+        x: Math.random() * 1000,
+        y: Math.random() * 500,
+        vx: (Math.random() - 0.5) * 1.5,
+        vy: (Math.random() - 0.5) * 1.5,
+        size: Math.random() * 2 + 1,
+        color: `hsla(${Math.random() * 360}, 70%, 70%, 0.6)`
       }));
     }
   };
 
   const togglePlay = () => {
     if (!audioRef.current) return;
-
     if (isPlaying) {
       audioRef.current.pause();
     } else {
@@ -88,11 +88,7 @@ export default function App() {
         sourceRef.current.connect(analyserRef.current);
         analyserRef.current.connect(audioContextRef.current.destination);
       }
-      
-      if (audioContextRef.current.state === 'suspended') {
-        audioContextRef.current.resume();
-      }
-      
+      if (audioContextRef.current.state === 'suspended') audioContextRef.current.resume();
       audioRef.current.play();
     }
     setIsPlaying(!isPlaying);
@@ -100,7 +96,6 @@ export default function App() {
 
   useEffect(() => {
     if (!analyserRef.current || !canvasRef.current) return;
-
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -112,515 +107,285 @@ export default function App() {
       animationRef.current = requestAnimationFrame(draw);
       analyserRef.current!.getByteFrequencyData(dataArray);
 
-      // Calculate volume and bass
       let sum = 0;
       let bassSum = 0;
-      const bassRange = Math.floor(bufferLength * 0.1); // First 10% for bass
-      
+      const bassRange = Math.floor(bufferLength * 0.1); 
       for (let i = 0; i < bufferLength; i++) {
         sum += dataArray[i];
         if (i < bassRange) bassSum += dataArray[i];
       }
-      const currentVol = sum / bufferLength;
-      const currentBass = bassSum / bassRange;
-      setVolume(currentVol);
-      setBass(currentBass);
+      setVolume(sum / bufferLength);
+      setBass(bassSum / bassRange);
 
       const currentTheme = THEMES[theme];
 
-      // Draw mini spectrum
       if (miniCanvasRef.current) {
         const miniCtx = miniCanvasRef.current.getContext('2d');
         if (miniCtx) {
           const mWidth = miniCanvasRef.current.width;
           const mHeight = miniCanvasRef.current.height;
-          
           miniCtx.clearRect(0, 0, mWidth, mHeight);
-          
           const barWidth = mWidth / bufferLength;
-          let x = 0;
-          
-          miniCtx.fillStyle = currentTheme.primary;
+          miniCtx.fillStyle = `${currentTheme.primary}40`;
           for (let i = 0; i < bufferLength; i++) {
             const barHeight = (dataArray[i] / 255) * mHeight;
-            miniCtx.fillRect(x, mHeight - barHeight, barWidth, barHeight);
-            x += barWidth;
+            miniCtx.fillRect(i * barWidth, mHeight - barHeight, barWidth - 1, barHeight);
           }
         }
       }
 
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.2)'; // Trail effect
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.15)'; 
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
 
       if (visualMode === 'bars') {
-        const barWidth = (canvas.width / bufferLength) * 2.5;
-        let x = 0;
-
+        const barWidth = (canvas.width / bufferLength) * 1.5;
         for (let i = 0; i < bufferLength; i++) {
-          const intensity = dataArray[i] / 255;
-          const barHeight = intensity * canvas.height * 0.4;
+          const val = dataArray[i] / 255;
+          const h = val * canvas.height * 0.45;
           const hue = currentTheme.hueBase + (i / bufferLength) * currentTheme.hueRange;
-          
-          ctx.fillStyle = `hsla(${hue}, 80%, 60%, 0.8)`;
-          ctx.shadowBlur = 15;
-          ctx.shadowColor = `hsla(${hue}, 80%, 60%, 0.5)`;
-          
-          // Draw top half
-          ctx.fillRect(x, centerY - barHeight, barWidth, barHeight);
-          // Draw bottom half
-          ctx.fillRect(x, centerY, barWidth, barHeight);
-          
-          x += barWidth + 1;
+          ctx.fillStyle = `hsla(${hue}, 80%, 65%, 0.9)`;
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = `hsla(${hue}, 80%, 65%, 0.4)`;
+          ctx.fillRect(i * barWidth * 1.8, centerY - h, barWidth, h * 2);
         }
-        ctx.shadowBlur = 0;
       } else if (visualMode === 'circular') {
-        const rotationOffset = Date.now() / 4000; // Slower rotation
-        const baseRadius = 100 + (currentBass / 255) * 40;
+        const rotation = Date.now() / 5000;
+        const radius = 120 + (bass / 255) * 50;
         
-        // 1. Core Glow
-        const coreGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, baseRadius * 1.5);
-        coreGradient.addColorStop(0, `${currentTheme.primary}80`);
-        coreGradient.addColorStop(0.5, `${currentTheme.secondary}20`);
-        coreGradient.addColorStop(1, 'transparent');
-        ctx.fillStyle = coreGradient;
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, baseRadius * 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 2. Continuous Circular Waveform (Inner)
         ctx.beginPath();
         for (let i = 0; i <= bufferLength; i++) {
-          const index = i % bufferLength;
-          const angle = (i / bufferLength) * Math.PI * 2 - rotationOffset;
-          const intensity = dataArray[index] / 255;
-          const r = baseRadius - 10 + intensity * 40;
-          
+          const angle = (i / bufferLength) * Math.PI * 2 + rotation;
+          const v = dataArray[i % bufferLength] / 255;
+          const r = radius + v * 60;
           const x = centerX + Math.cos(angle) * r;
           const y = centerY + Math.sin(angle) * r;
-          
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.closePath();
-        ctx.lineWidth = 3;
         ctx.strokeStyle = currentTheme.primary;
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = currentTheme.primary;
+        ctx.lineWidth = 4;
         ctx.stroke();
-        ctx.fillStyle = `${currentTheme.primary}20`;
+
+        // Outer Glow
+        const gradient = ctx.createRadialGradient(centerX, centerY, radius * 0.8, centerX, centerY, radius * 2);
+        gradient.addColorStop(0, 'transparent');
+        gradient.addColorStop(1, `${currentTheme.primary}10`);
+        ctx.fillStyle = gradient;
         ctx.fill();
 
-        // 3. Radiating Rays (Outer)
-        const numRays = 128; // Use a subset of the buffer for rays
-        const step = Math.floor(bufferLength / numRays);
-        
-        for (let i = 0; i < numRays; i++) {
-          const dataIndex = i * step;
-          const intensity = dataArray[dataIndex] / 255;
-          
-          if (intensity > 0.1) { // Only draw rays if there's enough energy
-            const angle = (i / numRays) * Math.PI * 2 + rotationOffset * 2;
-            const rayLength = intensity * 150;
-            const startRadius = baseRadius + 10;
-            
-            const x1 = centerX + Math.cos(angle) * startRadius;
-            const y1 = centerY + Math.sin(angle) * startRadius;
-            const x2 = centerX + Math.cos(angle) * (startRadius + rayLength);
-            const y2 = centerY + Math.sin(angle) * (startRadius + rayLength);
-
-            const hue = currentTheme.hueBase + (i / numRays) * currentTheme.hueRange;
-            
-            ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
-            ctx.lineWidth = 2 + intensity * 3;
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = `hsla(${hue}, 80%, 60%, ${0.3 + intensity * 0.7})`;
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = `hsla(${hue}, 80%, 60%, 0.8)`;
-            ctx.stroke();
-            
-            // Add a dot at the end of the ray
-            ctx.beginPath();
-            ctx.arc(x2, y2, 2 + intensity * 3, 0, Math.PI * 2);
-            ctx.fillStyle = '#fff';
-            ctx.fill();
-          }
+        // Pulsing dots
+        for (let i = 0; i < 48; i++) {
+          const angle = (i / 48) * Math.PI * 2 - rotation * 1.5;
+          const v = dataArray[(i * 4) % bufferLength] / 255;
+          const r = radius + 80 + v * 40;
+          ctx.beginPath();
+          ctx.arc(centerX + Math.cos(angle) * r, centerY + Math.sin(angle) * r, 1.5 + v * 3, 0, Math.PI * 2);
+          ctx.fillStyle = v > 0.5 ? '#fff' : `${currentTheme.secondary}aa`;
+          ctx.fill();
         }
-
-        // 4. Center Pulse Ring
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, baseRadius * 0.8, 0, Math.PI * 2);
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = `${currentTheme.secondary}80`;
-        ctx.shadowBlur = 0;
-        ctx.stroke();
-
-        // 5. Center Dot
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, 3 + (currentBass / 255) * 5, 0, Math.PI * 2);
-        ctx.fillStyle = '#fff';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#fff';
-        ctx.fill();
-        
-        ctx.shadowBlur = 0;
       } else if (visualMode === 'particles') {
-        if (particles.current.length === 0) {
-          particles.current = Array.from({ length: 100 }, () => ({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            vx: (Math.random() - 0.5) * 2,
-            vy: (Math.random() - 0.5) * 2,
-            size: Math.random() * 3 + 1,
-            color: '#fff'
-          }));
-        }
-
-        const connectionDistance = 120;
-
         particles.current.forEach((p, i) => {
-          const freqIndex = Math.floor((i / particles.current.length) * bufferLength);
-          const intensity = dataArray[freqIndex] / 255;
-          
-          p.x += p.vx * (1 + intensity * 5);
-          p.y += p.vy * (1 + intensity * 5);
-
+          const v = dataArray[i % bufferLength] / 255;
+          p.x += p.vx * (1 + v * 4);
+          p.y += p.vy * (1 + v * 4);
           if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
           if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-
-          const hue = currentTheme.hueBase + (i % currentTheme.hueRange);
-          const color = `hsla(${hue}, 70%, 60%, 0.8)`;
-
-          // Draw connections
-          for (let j = i + 1; j < particles.current.length; j++) {
-            const p2 = particles.current[j];
-            const dx = p.x - p2.x;
-            const dy = p.y - p2.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-
-            if (distance < connectionDistance) {
-              ctx.beginPath();
-              ctx.moveTo(p.x, p.y);
-              ctx.lineTo(p2.x, p2.y);
-              const opacity = (1 - distance / connectionDistance) * 0.4 * (1 + intensity);
-              ctx.strokeStyle = `hsla(${hue}, 70%, 60%, ${opacity})`;
-              ctx.lineWidth = 1 + intensity * 2;
-              ctx.stroke();
-            }
-          }
-
+          
           ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size * (1 + intensity * 3), 0, Math.PI * 2);
-          ctx.fillStyle = color;
-          ctx.shadowBlur = intensity * 20;
-          ctx.shadowColor = color;
+          ctx.arc(p.x, p.y, p.size * (1 + v * 2.5), 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${currentTheme.hueBase + (i % 40)}, 80%, 70%, ${0.3 + v * 0.7})`;
           ctx.fill();
         });
-        ctx.shadowBlur = 0;
       } else {
-        // Enhanced Waveform
         analyserRef.current!.getByteTimeDomainData(dataArray);
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = currentTheme.primary;
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = currentTheme.primary;
         ctx.beginPath();
-
-        const sliceWidth = canvas.width * 1.0 / bufferLength;
-        let x = 0;
-
+        const sliceWidth = canvas.width / bufferLength;
         for (let i = 0; i < bufferLength; i++) {
           const v = dataArray[i] / 128.0;
           const y = v * canvas.height / 2;
-
-          if (i === 0) {
-            ctx.moveTo(x, y);
-          } else {
-            ctx.lineTo(x, y);
-          }
-          x += sliceWidth;
+          if (i === 0) ctx.moveTo(i * sliceWidth, y); else ctx.lineTo(i * sliceWidth, y);
         }
-        ctx.lineTo(canvas.width, canvas.height / 2);
+        ctx.strokeStyle = currentTheme.secondary;
+        ctx.lineWidth = 3;
         ctx.stroke();
-        ctx.shadowBlur = 0;
       }
     };
-
     draw();
-
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    };
-  }, [visualMode, file, theme]);
+    return () => animationRef.current ? cancelAnimationFrame(animationRef.current) : undefined;
+  }, [visualMode, theme]);
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-200 font-sans selection:bg-blue-500/30 overflow-x-hidden">
-      {/* Background Ambient Glow */}
-      <div className="fixed inset-0 pointer-events-none transition-colors duration-1000">
-        <div className={`absolute top-[-10%] left-[-10%] w-[40%] h-[40%] ${THEMES[theme].bgGlow1} blur-[120px] rounded-full transition-colors duration-1000`} />
-        <div className={`absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] ${THEMES[theme].bgGlow2} blur-[120px] rounded-full transition-colors duration-1000`} />
+    <div className="min-h-screen bg-[#020617] text-slate-100 font-sans selection:bg-blue-500/30 overflow-x-hidden antialiased">
+      {/* Background Ambient Layers */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className={`absolute -top-[20%] -left-[10%] w-[60%] h-[60%] ${THEMES[theme].bgGlow1} blur-[140px] rounded-full transition-all duration-1000`} />
+        <div className={`absolute -bottom-[20%] -right-[10%] w-[60%] h-[60%] ${THEMES[theme].bgGlow2} blur-[140px] rounded-full transition-all duration-1000`} />
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] mix-blend-overlay" />
       </div>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-6 py-12">
-        {/* Header */}
-        <header className="mb-12 flex flex-col md:flex-row items-center justify-between gap-6">
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-          >
-            <h1 className={`text-5xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${THEMES[theme].textGradient} mb-2 transition-all duration-1000`}>
-              SONIC VIZ
-            </h1>
-            <p className="text-slate-500 font-medium tracking-wide">ADVANCED AUDIO ANALYTICS ENGINE</p>
+      <div className="relative z-10 max-w-6xl mx-auto px-8 py-10">
+        {/* Navigation / Header */}
+        <header className="mb-14 flex items-center justify-between">
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-4">
+            <div className={`p-2.5 rounded-2xl bg-gradient-to-br ${THEMES[theme].textGradient} opacity-20`} />
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-slate-400">
+                声影律动 <span className="text-sm font-medium tracking-[0.2em] text-slate-500 ml-2">SONIC VIZ</span>
+              </h1>
+              <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500 mt-0.5">次世代音频可视化引擎</p>
+            </div>
           </motion.div>
-          
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Theme Selector */}
-            <div className="flex bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 backdrop-blur-xl shadow-2xl">
-              {(Object.keys(THEMES) as Theme[]).map((t) => (
-                <button 
-                  key={t}
-                  onClick={() => setTheme(t)}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl transition-all duration-300 ${
-                    theme === t 
-                      ? 'bg-slate-800 text-white shadow-lg' 
-                      : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
-                  }`}
-                >
-                  <Palette size={16} color={THEMES[t].primary} />
-                  <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">{t}</span>
-                </button>
-              ))}
-            </div>
 
-            <div className="flex bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 backdrop-blur-xl shadow-2xl">
-              {[
-                { id: 'waveform', icon: Activity, label: 'Wave' },
-                { id: 'bars', icon: BarChart3, label: 'Bars' },
-                { id: 'circular', icon: Disc, label: 'Orbit' },
-                { id: 'particles', icon: Sparkles, label: 'Dust' }
-              ].map((mode) => (
-                <button 
-                  key={mode.id}
-                  onClick={() => setVisualMode(mode.id as VisualMode)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-300 ${
-                    visualMode === mode.id 
-                      ? 'bg-slate-800 text-white shadow-lg' 
-                      : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
-                  }`}
-                  style={{
-                    backgroundColor: visualMode === mode.id ? THEMES[theme].primary : undefined,
-                    boxShadow: visualMode === mode.id ? `0 10px 15px -3px ${THEMES[theme].primary}40` : undefined
-                  }}
-                >
-                  <mode.icon size={18} />
-                  <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">{mode.label}</span>
-                </button>
-              ))}
-            </div>
+          <div className="flex items-center gap-3">
+             <div className="hidden md:flex items-center gap-1.5 p-1 bg-white/5 backdrop-blur-3xl rounded-xl border border-white/10">
+                {(Object.keys(THEMES) as Theme[]).map((t) => (
+                  <button key={t} onClick={() => setTheme(t)} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${theme === t ? 'bg-white/10 text-white shadow-xl' : 'text-slate-500 hover:text-slate-300'}`}>
+                    {THEMES[t].name}
+                  </button>
+                ))}
+             </div>
+             <button className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors">
+               <Settings2 size={18} />
+             </button>
           </div>
         </header>
 
-        {/* Main Interface */}
-        <main className="grid gap-8">
-          {/* Visualization Area */}
-          <section className="relative bg-slate-950 border border-slate-800/50 rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_-12px_rgba(59,130,246,0.2)]">
-            <div className="absolute top-8 left-8 z-10 flex items-center gap-3 bg-black/40 px-4 py-2 rounded-full border border-white/5 backdrop-blur-xl">
-              <motion.div 
-                animate={{ scale: isPlaying ? [1, 1.2, 1] : 1 }}
-                transition={{ repeat: Infinity, duration: 0.5 }}
-                className={`w-2.5 h-2.5 rounded-full ${isPlaying ? 'bg-blue-500 shadow-[0_0_10px_#3b82f6]' : 'bg-slate-700'}`} 
-              />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                {isPlaying ? 'Signal Processing' : 'System Ready'}
-              </span>
-            </div>
-
-            <canvas 
-              ref={canvasRef} 
-              width={1000} 
-              height={450} 
-              className="w-full h-[450px] block cursor-crosshair"
-            />
-
-            {/* Energy Meters */}
-            <div className="absolute bottom-8 left-8 right-8 flex justify-between items-end">
-              <div className="flex gap-8">
-                <div className="space-y-2">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Bass Energy</div>
-                  <div className="w-32 h-1.5 bg-slate-900 rounded-full overflow-hidden">
-                    <motion.div 
-                      className="h-full"
-                      style={{ backgroundColor: THEMES[theme].primary, boxShadow: `0 0 15px ${THEMES[theme].primary}` }}
-                      animate={{ width: `${(bass / 255) * 100}%` }}
-                      transition={{ type: 'spring', bounce: 0, duration: 0.1 }}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Master Gain</div>
-                  <div className="w-32 h-1.5 bg-slate-900 rounded-full overflow-hidden">
-                    <motion.div 
-                      className="h-full"
-                      style={{ backgroundColor: THEMES[theme].secondary, boxShadow: `0 0 15px ${THEMES[theme].secondary}` }}
-                      animate={{ width: `${(volume / 255) * 100}%` }}
-                      transition={{ type: 'spring', bounce: 0, duration: 0.1 }}
-                    />
-                  </div>
-                </div>
+        {/* Workspace */}
+        <main className="grid lg:grid-cols-[1fr_320px] gap-10 items-start">
+          <div className="space-y-8">
+            {/* Stage */}
+            <div className="relative aspect-[16/9] bg-black/40 backdrop-blur-2xl rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl group">
+              <div className="absolute top-8 left-8 z-20 flex items-center gap-3 px-4 py-2 bg-black/20 backdrop-blur-xl border border-white/5 rounded-full">
+                <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : 'bg-slate-600'}`} />
+                <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                  {isPlaying ? '波形同步中' : '系统待命'}
+                </span>
               </div>
 
-              <div className="hidden md:flex items-center gap-4">
-                <div className="text-right">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Bit Depth</div>
-                  <div className="text-xl font-black text-white">24-BIT</div>
-                </div>
-                <div className="w-px h-8 bg-slate-800" />
-                <div className="text-right">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Latency</div>
-                  <div className="text-xl font-black text-white">0.4ms</div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Controls & Upload */}
-          <div className="grid lg:grid-cols-[1fr_350px] gap-8">
-            <div className="bg-slate-900/30 border border-slate-800/50 rounded-[2rem] p-8 backdrop-blur-md flex flex-col justify-center items-center gap-8">
-              {!file ? (
-                <label className="w-full cursor-pointer group">
-                  <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-slate-800 rounded-3xl group-hover:border-blue-500/50 group-hover:bg-blue-500/5 transition-all duration-500">
-                    <motion.div 
-                      whileHover={{ scale: 1.1, rotate: 5 }}
-                      className="w-20 h-20 bg-slate-800/50 rounded-3xl flex items-center justify-center mb-6 border border-slate-700 group-hover:border-blue-500/30 shadow-2xl"
-                    >
-                      <Upload className="text-slate-400 group-hover:text-blue-400" size={32} />
-                    </motion.div>
-                    <p className="text-xl text-slate-300 font-bold tracking-tight">Initialize Audio Stream</p>
-                    <p className="text-slate-500 text-sm mt-2 font-medium">Select a high-fidelity source file</p>
-                  </div>
-                  <input type="file" className="hidden" accept="audio/*" onChange={handleFileChange} />
-                </label>
-              ) : (
-                <div className="w-full space-y-8">
-                  <div className="flex items-center gap-6 bg-slate-950/80 p-6 rounded-3xl border border-slate-800 shadow-2xl">
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-600/20">
-                      <Music className="text-white" size={28} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xl text-white font-black truncate tracking-tight">{file.name}</p>
-                      <div className="flex gap-4 mt-1">
-                        <span className="text-slate-500 text-xs font-bold uppercase tracking-widest">{(file.size / (1024 * 1024)).toFixed(2)} MB</span>
-                        <span className="text-blue-500/60 text-xs font-bold uppercase tracking-widest">Source: Local</span>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setFile(null);
-                        setAudioUrl(null);
-                        setIsPlaying(false);
-                      }}
-                      className="p-3 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
-                    >
-                      <Activity size={20} />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-center gap-8">
-                    <motion.button 
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={togglePlay}
-                      className="w-24 h-24 bg-white text-slate-950 rounded-[2rem] flex items-center justify-center shadow-[0_20px_50px_-12px_rgba(255,255,255,0.3)] transition-all"
-                    >
-                      {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} className="ml-2" fill="currentColor" />}
-                    </motion.button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Side Panel */}
-            <div className="bg-slate-900/30 border border-slate-800/50 rounded-[2rem] p-8 backdrop-blur-md space-y-8">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-500">Live Telemetry</h3>
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              </div>
+              <canvas ref={canvasRef} width={1200} height={675} className="w-full h-full cursor-none" />
               
+              {/* Overlay Controls */}
+              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-4 group-hover:translate-y-0">
+                <div className="flex items-center gap-6 px-8 py-5 bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-2xl">
+                    <button onClick={togglePlay} className="w-14 h-14 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl">
+                      {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} className="ml-1" fill="currentColor" />}
+                    </button>
+                    <div className="h-12 w-px bg-white/10" />
+                    <div className="flex items-center gap-2">
+                       {[
+                        { id: 'waveform', icon: Activity, label: '波形' },
+                        { id: 'bars', icon: BarChart3, label: '频谱' },
+                        { id: 'circular', icon: Disc, label: '环绕' },
+                        { id: 'particles', icon: Sparkles, label: '星尘' }
+                      ].map((m) => (
+                        <button key={m.id} onClick={() => setVisualMode(m.id as VisualMode)} className={`p-3 rounded-2xl transition-all ${visualMode === m.id ? 'bg-white text-black' : 'text-slate-400 hover:bg-white/5'}`}>
+                          <m.icon size={20} />
+                        </button>
+                      ))}
+                    </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Section: Upload & Info */}
+            {!file ? (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-[3rem] hover:border-white/10 hover:bg-white/[0.02] transition-all cursor-pointer relative overflow-hidden group">
+                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="audio/*" onChange={handleFileChange} />
+                <div className="w-20 h-20 bg-white/5 rounded-[2rem] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
+                  <Upload className="text-slate-500 group-hover:text-white" size={32} />
+                </div>
+                <h3 className="text-xl font-bold">载入音频流</h3>
+                <p className="text-slate-500 text-sm mt-2">支持本地高保真音频文件解析</p>
+              </motion.div>
+            ) : (
+              <div className="flex items-center justify-between p-8 bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem]">
+                <div className="flex items-center gap-6">
+                  <div className={`w-16 h-16 rounded-[1.5rem] bg-gradient-to-br ${THEMES[theme].textGradient} flex items-center justify-center shadow-lg`}>
+                    <Music className="text-white" size={28} />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-bold truncate max-w-[200px] md:max-w-md">{file.name}</h4>
+                    <p className="text-xs text-slate-500 font-medium uppercase tracking-widest mt-1">
+                      {(file.size / (1024 * 1024)).toFixed(2)} MB • 系统已识别
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => { setFile(null); setAudioUrl(null); setIsPlaying(false); }} className="px-6 py-3 rounded-2xl bg-white/5 hover:bg-red-500/10 hover:text-red-400 text-slate-400 font-bold text-xs uppercase tracking-tighter transition-all">
+                  移除文件
+                </button>
+              </div>
+            )}
+          </div>
+
+          <aside className="space-y-8">
+            {/* Status Panel */}
+            <div className="p-8 bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] space-y-10">
+              <div className="flex items-center justify-between">
+                <h5 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">实时遥测数据</h5>
+                <Share2 size={14} className="text-slate-600" />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800">
-                  <div className="text-[10px] font-bold text-slate-600 uppercase mb-1">Peak</div>
-                  <div className="text-2xl font-black text-white">{Math.round(volume)}</div>
+                <div className="space-y-1.5">
+                  <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest pl-1">动态峰值</span>
+                  <div className="text-3xl font-black tabular-nums">{Math.round(volume)}</div>
                 </div>
-                <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800">
-                  <div className="text-[10px] font-bold text-slate-600 uppercase mb-1">Bass</div>
-                  <div className="text-2xl font-black text-blue-400">{Math.round(bass)}</div>
-                </div>
-              </div>
-
-              {/* Mini Spectrum */}
-              <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800">
-                <div className="text-[10px] font-bold text-slate-600 uppercase mb-3">Frequency Spectrum</div>
-                <canvas 
-                  ref={miniCanvasRef} 
-                  width={200} 
-                  height={60} 
-                  className="w-full h-[60px] rounded-lg opacity-80"
-                />
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-bold text-slate-400">FFT Size</span>
-                  <span className="text-sm font-black text-white">512</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-bold text-slate-400">Smoothing</span>
-                  <span className="text-sm font-black text-white">0.85</span>
+                <div className="space-y-1.5">
+                  <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest pl-1">低音能级</span>
+                  <div className={`text-3xl font-black tabular-nums transition-colors ${bass > 180 ? 'text-white' : 'text-slate-400'}`}>{Math.round(bass)}</div>
                 </div>
               </div>
 
-              <div className="pt-8 border-t border-slate-800">
-                <div className="flex items-center gap-3 text-slate-400 mb-6">
-                  <Volume2 size={18} />
-                  <span className="text-xs font-black uppercase tracking-widest">Phase Correlation</span>
+              {/* Advanced Indicators */}
+              <div className="space-y-6">
+                <div className="space-y-2.5">
+                   <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                     <span>频谱响应</span>
+                     <span>AUTO</span>
+                   </div>
+                   <canvas ref={miniCanvasRef} width={200} height={50} className="w-full h-12 rounded-xl opacity-60" />
                 </div>
-                <div className="flex items-end gap-1.5 h-16">
-                  {[...Array(12)].map((_, i) => (
-                    <motion.div 
-                      key={i}
-                      className="flex-1 bg-slate-800 rounded-full"
-                      animate={{ 
-                        height: isPlaying ? [10, Math.random() * 60 + 10, 10] : 10,
-                        backgroundColor: isPlaying ? (i > 8 ? THEMES[theme].secondary : THEMES[theme].primary) : '#1e293b'
-                      }}
-                      transition={{ 
-                        repeat: Infinity, 
-                        duration: 0.4 + Math.random() * 0.4,
-                        delay: i * 0.05 
-                      }}
-                    />
+
+                <div className="space-y-4">
+                  {[
+                    { label: '采样位深', value: '24-Bit' },
+                    { label: '响应延迟', value: '0.2ms' },
+                    { label: '相位修正', value: 'Active' }
+                  ].map((stat) => (
+                    <div key={stat.label} className="flex justify-between items-center py-0.5">
+                      <span className="text-xs font-medium text-slate-500">{stat.label}</span>
+                      <span className="text-xs font-bold tracking-tight">{stat.value}</span>
+                    </div>
                   ))}
                 </div>
               </div>
-            </div>
-          </div>
-        </main>
 
-        {/* Audio Element (Hidden) */}
-        {audioUrl && (
-          <audio 
-            ref={audioRef} 
-            src={audioUrl} 
-            onEnded={() => setIsPlaying(false)}
-            className="hidden"
-          />
-        )}
+              <div className="pt-6 border-t border-white/5">
+                <div className="flex items-center gap-2 mb-6">
+                  <Volume2 size={14} className="text-slate-500" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">相位能量分布</span>
+                </div>
+                <div className="flex items-end gap-1.5 h-12">
+                   {[...Array(10)].map((_, i) => (
+                     <motion.div key={i} className="flex-1 rounded-full bg-white/10" animate={{ height: isPlaying ? [8, Math.random() * 40 + 8, 8] : 8, backgroundColor: isPlaying ? (i > 7 ? THEMES[theme].secondary : THEMES[theme].primary) + '88' : 'rgba(255,255,255,0.05)' }} transition={{ repeat: Infinity, duration: 0.5 + Math.random() * 0.5, delay: i * 0.1 }} />
+                   ))}
+                </div>
+              </div>
+            </div>
+            
+            <p className="text-center text-[9px] text-slate-600 font-medium tracking-widest uppercase">
+              Powered by Web Audio API v2
+            </p>
+          </aside>
+        </main>
       </div>
+
+      {audioUrl && (
+        <audio ref={audioRef} src={audioUrl} onEnded={() => setIsPlaying(false)} className="hidden" />
+      )}
     </div>
   );
 }
